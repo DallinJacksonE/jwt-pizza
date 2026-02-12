@@ -260,6 +260,7 @@ test('diner dashboard', async ({ page }) => {
   await page.getByRole('button', { name: 'Pay now' }).click();
   await page.getByRole('button', { name: 'Verify' }).click();
   await page.getByRole('button', { name: 'Close' }).click();
+  await expect(page.locator('#hs-jwt-modal-backdrop')).toBeHidden();
   await page.getByRole('link', { name: 'KC' }).click();
   await expect(page.getByRole('main')).toContainText('diner');
   await page.getByLabel('Global').getByRole('link', { name: 'Franchise' }).click();
