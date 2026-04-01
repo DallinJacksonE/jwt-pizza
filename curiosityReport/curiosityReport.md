@@ -100,3 +100,81 @@ The result is a linear, cleaner history—it looks as if you started your featur
 - **`--soft`**: Moves the branch pointer to `<commit>` but does nothing else. The changes from the commits you "undid" are left in the staging area (`git status` will show them as "Changes to be committed").
 - **`--mixed` (the default)**: Moves the branch pointer and also resets the staging area to match the specified commit. The changes are still in your working directory, but they are unstaged.
 - **`--hard`**: Moves the branch pointer, resets the staging area, and overwrites your working directory to match the specified commit. This is destructive and will permanently delete uncommitted changes.
+
+#### `git revert`
+
+> `git revert <commit>` - Revert some existing commits.
+
+**Explanation:**
+`git revert` is used to undo the changes made by a specific commit. Unlike `git reset`, which can alter the project history, `git revert` creates a _new_ commit that applies the inverse of the changes from the target commit. For example, if the original commit added a line of code, the revert commit will remove that line. This is the safe and recommended way to undo changes on a public or shared branch because it doesn't rewrite the commit history that others may be relying on. It simply adds a new commit to the end of the branch history.
+
+### Plumbing Commands
+
+> While porcelain commands are for day-to-day use, plumbing commands give you direct access to the underlying Git objects and repository structure. Understanding them helps demystify what Git is doing. Here are a few key ones.
+
+#### `git cat-file`
+
+> `git cat-file -p <hash>` - Pretty-print the contents of the object at `<hash>`.
+> `git cat-file -t <hash>` - Show the type of the object at `<hash>` (blob, tree, commit, or tag).
+
+**Explanation:**
+This is your window into the Git database. Every object in Git (a file version is a "blob", a directory is a "tree", a commit is a "commit") has a hash. You can use `cat-file` to see exactly what Git has stored for that hash. For example, `git cat-file -p HEAD` will show you the contents of the most recent commit object: its parent, the tree it points to, the author, and the commit message. [14, 24, 35, 37]
+
+#### `git hash-object`
+
+> `git hash-object <file>` - Computes the object ID value for an object with specified content.
+
+**Explanation:**
+This command takes a file and tells you what its hash would be if you were to add it to Git's object database. [8] If you use the `-w` flag (`git hash-object -w <file>`), it will actually write that object into the database. [1, 6] This demonstrates Git's content-addressable storage system: the content of the file determines its hash and how it's stored. It doesn't add the file to the staging area, it just creates the "blob" object.
+
+#### `git write-tree`
+
+> `git write-tree` - Create a tree object from the current index.
+
+**Explanation:**
+After you've staged your changes with `git add` (or the plumbing equivalent, `git update-index`), the staging area is ready. `git write-tree` takes the contents of the staging area and writes a "tree" object to the Git database. [5, 30] This tree object represents the state of the project's directory for the upcoming commit. The command returns the hash of the newly created tree object.
+
+#### `git commit-tree`
+
+> `git commit-tree <tree-hash> -p <parent-commit-hash>` - Create a new commit object.
+
+**Explanation:**
+This is the command that actually creates a commit. [21] You provide it with the hash of a tree object (from `git write-tree`), the hash of the parent commit(s) (using the `-p` flag), and a commit message via standard input. [29] It will create a new commit object and print its hash. The porcelain `git commit` command is essentially a wrapper around `git write-tree` and `git commit-tree`, plus the logic to update the current branch pointer to the new commit. [5]
+
+### In Practice
+
+Having dug into these more deeply, and understanding what Git actually is, now the common errors I run into while using Git have a solution.
+
+#### Ammending Git commits (forgetting a file or needing to change commit message)
+
+I'll often forget to add a file to my stage before commiting and then make a whole new commit. In an effort to preserve a good commit history with meaningful commits and messages to indicate the state of the project, you can ammend the most recent git commit rather than having to commit again.
+
+> `git commit --ammend` - Run after adding the file(s) missed.
+> `git commit --ammend -m "New commit message"` - Replaces the previous commit message with the provided message.
+
+#### Reseting Working Directory to previous commit
+
+If you have been locally working on a feature and have borked everything, you can reset your working directory back to the commit you started with.
+
+> `git reset --hard HEAD` - Undo your changes and start from the most recent commit again. Does not delete any commits, resets your working directory and stage.
+
+> [!CAUTION]
+> Using git reset --hard should always spark hesitation, as if used to go to a different commit other than HEAD, all commits which came after that other commit will be deleted and the stage and working directory wiill be reset.
+
+#### Combining local commits into a larger commit
+
+If your local commits would be better served as a single commit and push to the remote, you can "combine" them. This is also helpful if you have made commits that contain errors and you want to fix before pushing them to the remote.
+
+> `git reset --soft <commit>` - This will move your HEAD pointer to the given commit. The commits that came after will be deleted, but your stage and working directory will still contain the changes and edits you made to those commits. This way you can recommit and essentially combine the deleted commits into one.
+
+> `git reset --mixed <commit>` - The mixed flag is the default for the reset command. Mixed will clear your staging area, but keep your working directory. This means that you will need to add the files and their changes to the stage again, but is helpful if you just committed you node_modules or other secerets that you don't want to appear in any git history for someone to find.
+
+#### Revert a pushed commit
+
+If you have made an error in your commit and already pushed it to a shared repository, then you can safely revert it. Reverting doesn't remove the commit, but will undo the effects of that commit onto the current MAIN commit. This is important for shared repositories. If you are using reset or rebase, errors can occur when you delete a commit that someone else will then push back onto the tree when they commit a new change. These errors are very messy and should be avoided.
+
+> `git revert <commit>` - Makes a new commit from MAIN that has had the changes of the provided commit undone to it.
+
+## Final Thoughts
+
+This was a really educational Curiosity Report for me. I have never understood why I needed to add my files, then commit them, then push them when I thought it should just be one command. Understanding the staging, commiting, and pushing better I now see the power it provides in cleaning up the version history. I also didn't know any commands other than `git init`, `git add .`, `git commit -am "did stuff`, `git push`. I feel like now I understand what git actually is and I am not in the dark when problems arise. I feel much more confident in how I can use git to collaborate on a bigger team with lots of branches and fast changes.
